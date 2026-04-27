@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
         appBarConfiguration = new AppBarConfiguration.Builder(navController.getGraph()).build();
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
 
-        // Obsługa TabLayout dla przełączania między fragmentami (Sekcja 1 i 2)
+        // Obsługa TabLayout dla przełączania między fragmentami (Sekcja 1, 2 i 3)
         binding.tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
@@ -36,6 +36,8 @@ public class MainActivity extends AppCompatActivity {
                     navController.navigate(R.id.FirstFragment);
                 } else if (tab.getPosition() == 1) {
                     navController.navigate(R.id.SecondFragment);
+                } else if (tab.getPosition() == 2) {
+                    navController.navigate(R.id.ThirdFragment);
                 }
             }
 
@@ -56,14 +58,12 @@ public class MainActivity extends AppCompatActivity {
                 if (binding.tabs.getSelectedTabPosition() != 1) {
                     binding.tabs.getTabAt(1).select();
                 }
+            } else if (destination.getId() == R.id.ThirdFragment) {
+                if (binding.tabs.getSelectedTabPosition() != 2) {
+                    binding.tabs.getTabAt(2).select();
+                }
             }
         });
-
-        binding.fab.setOnClickListener(view -> 
-            Snackbar.make(view, "Użyj pola tekstowego w aplikacji, aby wysłać prompt.", Snackbar.LENGTH_LONG)
-                .setAnchorView(R.id.fab)
-                .setAction("Action", null).show()
-        );
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,8 +27,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+
+import ApiClient.ApiClient;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
 
 public class SecondFragment extends Fragment {
 
@@ -124,6 +131,67 @@ public class SecondFragment extends Fragment {
                 NavHostFragment.findNavController(SecondFragment.this)
                         .navigate(R.id.action_SecondFragment_to_FirstFragment)
         );
+        binding.sortTasksButton.setOnClickListener(v -> {
+            binding.sortTasksButton.setEnabled(false);
+            String fullPrompt = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // TODO zmienić taskList na JSON
+                // TODO zmienić sposób pobierania czasu, żeby działał na starszych urządzeniach
+                fullPrompt = " Today: " + LocalDate.now().toString() +" Tasks: " +taskList.toString();
+            }
+            ApiClient.sendPrompt(fullPrompt, new Callback() {
+                @Override
+                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            // TODO co zrobic w przypadku błędu
+                            // addMessage(new FirstFragment.ChatMessage("Błąd połączenia: " + e.getMessage(), false));
+                            binding.sortTasksButton.setEnabled(true);
+                        });
+                    }
+                }
+
+                @Override
+                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                    try (Response resp = response) {
+                        String responseBody = resp.body().string();
+                        if (resp.isSuccessful()) {
+                            // wyciągnięcie tekstu z odpowiedzi AI
+                            JSONObject json = new JSONObject(responseBody);
+                            String rawText = json.getJSONArray("candidates")
+                                    .getJSONObject(0)
+                                    .getJSONObject("content")
+                                    .getJSONArray("parts")
+                                    .getJSONObject(0)
+                                    .getString("text");
+
+                            processModelSorting(rawText);
+                        } else {
+                            if (getActivity() != null) {
+                                getActivity().runOnUiThread(() -> {
+                                    // TODO co zrobic w przypadku błędu
+                                    // addMessage(new FirstFragment.ChatMessage("Błąd serwera (kod " + resp.code() + ").", false));
+                                    binding.sortTasksButton.setEnabled(true);
+                                });
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                // TODO co zrobic w przypadku błędu
+                                // addMessage(new FirstFragment.ChatMessage("Błąd przetwarzania: " + e.getMessage(), false));
+                                binding.sortTasksButton.setEnabled(true);
+                            });
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    private void processModelSorting(String rawText) {
+        // TODO przetwarzanie odpowiedzi modelu na kolejność tasków
+        binding.sortTasksButton.setEnabled(true);
     }
 
     private void clearInputs() {

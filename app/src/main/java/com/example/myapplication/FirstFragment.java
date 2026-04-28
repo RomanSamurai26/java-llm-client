@@ -38,6 +38,8 @@ public class FirstFragment extends Fragment {
     private ChatAdapter chatAdapter;
     private final List<ChatMessage> chatMessages = new ArrayList<>();
     private static final String CHAT_FILE = "chat_history.json";
+    private static final String TASKS_FILE = "tasks.json";
+    private boolean useSay1 = true;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -48,12 +50,15 @@ public class FirstFragment extends Fragment {
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Wczytaj historię z pliku
         loadChatHistory();
 
         chatAdapter = new ChatAdapter(chatMessages);
         binding.recyclerViewChat.setLayoutManager(new LinearLayoutManager(getContext()));
         binding.recyclerViewChat.setAdapter(chatAdapter);
+
+        // Ustawienie początkowego zdjęcia Sebastiana
+        binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
+        updateBotPresence(false); // Nie zmieniaj obrazka przy starcie, tylko pokaż dymek
 
         if (!chatMessages.isEmpty()) {
             binding.recyclerViewChat.scrollToPosition(chatMessages.size() - 1);
@@ -66,22 +71,22 @@ public class FirstFragment extends Fragment {
                 return;
             }
 
-            // Dodajemy widoczną wiadomość użytkownika do listy
+            // Użytkownik wysyła prompt - Sebastian myśli
+            binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_think);
+
             addMessage(new ChatMessage(userPrompt, true));
             binding.edittextPrompt.setText("");
             binding.buttonFirst.setEnabled(false);
 
-            // Przygotowujemy kontekst z zadaniami dla AI
             String tasksContext = loadTasksForContext();
-            String fullPrompt = "Oto lista moich zadań:\n" + tasksContext + 
-                               "\n\nUżytkownik pyta: " + userPrompt + 
-                               "\nOdpowiedz na podstawie moich zadań jeśli pytanie ich dotyczy.";
+            String fullPrompt = "KONTEKST ZADAŃ:\n" + tasksContext + "\n\nPYTANIE: " + userPrompt;
 
             ApiClient.sendPrompt(fullPrompt, new Callback() {
                 @Override
                 public void onFailure(@NonNull Call call, @NonNull IOException e) {
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
+                            binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
                             addMessage(new ChatMessage("Błąd połączenia: " + e.getMessage(), false));
                             binding.buttonFirst.setEnabled(true);
                         });
@@ -92,28 +97,30 @@ public class FirstFragment extends Fragment {
                 public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                     try (Response resp = response) {
                         String responseBody = resp.body().string();
-                        String resultText;
-
                         if (resp.isSuccessful()) {
-                            try {
-                                JSONObject json = new JSONObject(responseBody);
-                                resultText = json.getJSONArray("candidates")
-                                        .getJSONObject(0)
-                                        .getJSONObject("content")
-                                        .getJSONArray("parts")
-                                        .getJSONObject(0)
-                                        .getString("text");
-                            } catch (Exception e) {
-                                resultText = "Błąd parsowania: " + e.getMessage();
-                            }
-                        } else {
-                            resultText = "Błąd serwera (kod " + resp.code() + ")";
-                        }
+                            JSONObject json = new JSONObject(responseBody);
+                            String rawText = json.getJSONArray("candidates")
+                                    .getJSONObject(0)
+                                    .getJSONObject("content")
+                                    .getJSONArray("parts")
+                                    .getJSONObject(0)
+                                    .getString("text");
 
-                        final String finalResult = resultText;
+                            processModelResponse(rawText);
+                        } else {
+                            if (getActivity() != null) {
+                                getActivity().runOnUiThread(() -> {
+                                    binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
+                                    addMessage(new ChatMessage("Błąd serwera (kod " + resp.code() + ").", false));
+                                    binding.buttonFirst.setEnabled(true);
+                                });
+                            }
+                        }
+                    } catch (Exception e) {
                         if (getActivity() != null) {
                             getActivity().runOnUiThread(() -> {
-                                addMessage(new ChatMessage(finalResult, false));
+                                binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
+                                addMessage(new ChatMessage("Błąd przetwarzania: " + e.getMessage(), false));
                                 binding.buttonFirst.setEnabled(true);
                             });
                         }
@@ -123,30 +130,130 @@ public class FirstFragment extends Fragment {
         });
     }
 
-    private String loadTasksForContext() {
-        try (FileInputStream fis = requireContext().openFileInput("tasks.json");
+    private void updateBotPresence(boolean isNewBotMessage) {
+        String lastBotMsg = null;
+        for (int i = chatMessages.size() - 1; i >= 0; i--) {
+            if (!chatMessages.get(i).isUser) {
+                lastBotMsg = chatMessages.get(i).text;
+                break;
+            }
+        }
+
+        if (lastBotMsg != null) {
+            binding.layoutBotPresence.setVisibility(View.VISIBLE);
+            binding.tvLastBotMessage.setText(lastBotMsg);
+            
+            // Zmieniamy na say_1/say_2 TYLKO jeśli to faktycznie nowa odpowiedź bota
+            if (isNewBotMessage) {
+                if (useSay1) {
+                    binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_say_1);
+                } else {
+                    binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_say_2);
+                }
+                useSay1 = !useSay1;
+            }
+        } else {
+            binding.layoutBotPresence.setVisibility(View.GONE);
+            binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
+        }
+    }
+
+    private void processModelResponse(String rawText) {
+        if (getActivity() == null) return;
+
+        getActivity().runOnUiThread(() -> {
+            String visibleText = rawText;
+            try {
+                if (rawText.contains("ACTION_JSON:")) {
+                    String[] parts = rawText.split("ACTION_JSON:");
+                    visibleText = parts[0].trim();
+                    String jsonPart = parts[1].trim();
+                    
+                    JSONObject actionObj = new JSONObject(jsonPart);
+                    String action = actionObj.getString("action");
+
+                    if ("ADD".equals(action)) {
+                        addTaskFromAI(actionObj.getJSONObject("task"));
+                    } else if ("DELETE".equals(action)) {
+                        deleteTaskFromAI(actionObj.getInt("id"));
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            addMessage(new ChatMessage(visibleText, false));
+            binding.buttonFirst.setEnabled(true);
+        });
+    }
+
+    private void addTaskFromAI(JSONObject taskJson) throws Exception {
+        List<SecondFragment.Task> tasks = loadAllTasks();
+        int newId = tasks.isEmpty() ? 1 : tasks.get(tasks.size() - 1).id + 1;
+        
+        SecondFragment.Task newTask = new SecondFragment.Task(
+            newId,
+            taskJson.optString("description", "Bez opisu"),
+            taskJson.optString("deadline", "dd-mm-yyyy"),
+            taskJson.optInt("coolness", 3),
+            taskJson.optInt("estimatedTime", 0),
+            taskJson.optString("type", "E"),
+            taskJson.optString("extraInfo", "")
+        );
+        
+        tasks.add(newTask);
+        saveAllTasks(tasks);
+        Toast.makeText(getContext(), "Lokaj dodał zadanie #" + newId, Toast.LENGTH_SHORT).show();
+    }
+
+    private void deleteTaskFromAI(int taskId) throws Exception {
+        List<SecondFragment.Task> tasks = loadAllTasks();
+        boolean removed = false;
+        for (int i = 0; i < tasks.size(); i++) {
+            if (tasks.get(i).id == taskId) {
+                tasks.remove(i);
+                removed = true;
+                break;
+            }
+        }
+        if (removed) {
+            saveAllTasks(tasks);
+            Toast.makeText(getContext(), "Lokaj usunął zadanie #" + taskId, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private List<SecondFragment.Task> loadAllTasks() {
+        List<SecondFragment.Task> list = new ArrayList<>();
+        try (FileInputStream fis = requireContext().openFileInput(TASKS_FILE);
              InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
              BufferedReader reader = new BufferedReader(isr)) {
-            
             StringBuilder sb = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
+            while ((line = reader.readLine()) != null) sb.append(line);
+            JSONArray arr = new JSONArray(sb.toString());
+            for (int i = 0; i < arr.length(); i++) {
+                list.add(SecondFragment.Task.fromJSON(arr.getJSONObject(i)));
             }
-            
-            JSONArray jsonArray = new JSONArray(sb.toString());
-            if (jsonArray.length() == 0) return "(Brak zadań na liście)";
+        } catch (Exception ignored) {}
+        return list;
+    }
 
-            StringBuilder tasksList = new StringBuilder();
-            for (int i = 0; i < jsonArray.length(); i++) {
-                tasksList.append("- ").append(jsonArray.getString(i)).append("\n");
-            }
-            return tasksList.toString();
-        } catch (IOException e) {
-            return "(Nie udało się wczytać pliku zadań)";
-        } catch (Exception e) {
-            return "(Błąd odczytu zadań)";
+    private void saveAllTasks(List<SecondFragment.Task> tasks) throws Exception {
+        JSONArray arr = new JSONArray();
+        for (SecondFragment.Task t : tasks) arr.put(t.toJSON());
+        try (FileOutputStream fos = requireContext().openFileOutput(TASKS_FILE, Context.MODE_PRIVATE)) {
+            fos.write(arr.toString().getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    private String loadTasksForContext() {
+        List<SecondFragment.Task> tasks = loadAllTasks();
+        if (tasks.isEmpty()) return "(Brak zadań)";
+        StringBuilder sb = new StringBuilder();
+        for (SecondFragment.Task t : tasks) {
+            sb.append(String.format("#%d: %s (Deadline: %s, Rodzaj: %s)\n", t.id, t.description, t.deadline, t.type));
+        }
+        return sb.toString();
     }
 
     private void addMessage(ChatMessage message) {
@@ -154,23 +261,21 @@ public class FirstFragment extends Fragment {
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
         binding.recyclerViewChat.scrollToPosition(chatMessages.size() - 1);
         saveChatHistory();
+        updateBotPresence(!message.isUser); // Zmień obrazek tylko jeśli to wiadomość bota
     }
 
     private void saveChatHistory() {
         try {
-            JSONArray jsonArray = new JSONArray();
-            for (ChatMessage msg : chatMessages) {
-                JSONObject obj = new JSONObject();
-                obj.put("text", msg.text);
-                obj.put("isUser", msg.isUser);
-                jsonArray.put(obj);
+            JSONArray arr = new JSONArray();
+            for (ChatMessage m : chatMessages) {
+                JSONObject o = new JSONObject();
+                o.put("text", m.text); o.put("isUser", m.isUser);
+                arr.put(o);
             }
             try (FileOutputStream fos = requireContext().openFileOutput(CHAT_FILE, Context.MODE_PRIVATE)) {
-                fos.write(jsonArray.toString().getBytes(StandardCharsets.UTF_8));
+                fos.write(arr.toString().getBytes(StandardCharsets.UTF_8));
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     private void loadChatHistory() {
@@ -178,94 +283,56 @@ public class FirstFragment extends Fragment {
         try (FileInputStream fis = requireContext().openFileInput(CHAT_FILE);
              InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
              BufferedReader reader = new BufferedReader(isr)) {
-            
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
+            StringBuilder sb = new StringBuilder(); String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            JSONArray arr = new JSONArray(sb.toString());
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                chatMessages.add(new ChatMessage(o.getString("text"), o.getBoolean("isUser")));
             }
-            
-            JSONArray jsonArray = new JSONArray(sb.toString());
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONObject obj = jsonArray.getJSONObject(i);
-                chatMessages.add(new ChatMessage(obj.getString("text"), obj.getBoolean("isUser")));
-            }
-        } catch (IOException ignored) {
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception ignored) {}
     }
 
     @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        binding = null;
-    }
+    public void onDestroyView() { super.onDestroyView(); binding = null; }
 
     private static class ChatMessage {
-        String text;
-        boolean isUser;
-        ChatMessage(String text, boolean isUser) {
-            this.text = text;
-            this.isUser = isUser;
-        }
+        String text; boolean isUser;
+        ChatMessage(String text, boolean isUser) { this.text = text; this.isUser = isUser; }
     }
 
     private class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         private final List<ChatMessage> messages;
-        private static final int VIEW_TYPE_USER = 1;
-        private static final int VIEW_TYPE_BOT = 2;
-
-        ChatAdapter(List<ChatMessage> messages) {
-            this.messages = messages;
+        ChatAdapter(List<ChatMessage> m) { this.messages = m; }
+        @Override public int getItemViewType(int p) { return messages.get(p).isUser ? 1 : 2; }
+        @NonNull @Override public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup p, int v) {
+            View view = LayoutInflater.from(p.getContext()).inflate(v == 1 ? R.layout.item_chat_user : R.layout.item_chat_bot, p, false);
+            return v == 1 ? new UserVH(view) : new BotVH(view);
         }
-
-        @Override
-        public int getItemViewType(int position) {
-            return messages.get(position).isUser ? VIEW_TYPE_USER : VIEW_TYPE_BOT;
-        }
-
-        @NonNull
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            if (viewType == VIEW_TYPE_USER) {
-                View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_chat_user, parent, false);
-                return new UserViewHolder(view);
-            } else {
-                View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_chat_bot, parent, false);
-                return new BotViewHolder(view);
+        @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder h, int p) {
+            if (h instanceof UserVH) ((UserVH) h).t.setText(messages.get(p).text);
+            else {
+                BotVH botVH = (BotVH) h;
+                if (p == findLastBotMessageIndex()) {
+                    botVH.itemView.setVisibility(View.GONE);
+                    botVH.itemView.setLayoutParams(new RecyclerView.LayoutParams(0, 0));
+                } else {
+                    botVH.itemView.setVisibility(View.VISIBLE);
+                    botVH.itemView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                    botVH.t.setText(messages.get(p).text);
+                }
             }
         }
 
-        @Override
-        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            ChatMessage message = messages.get(position);
-            if (holder instanceof UserViewHolder) {
-                ((UserViewHolder) holder).textUser.setText(message.text);
-            } else {
-                ((BotViewHolder) holder).textBot.setText(message.text);
+        private int findLastBotMessageIndex() {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (!messages.get(i).isUser) return i;
             }
+            return -1;
         }
 
-        @Override
-        public int getItemCount() {
-            return messages.size();
-        }
-
-        class UserViewHolder extends RecyclerView.ViewHolder {
-            TextView textUser;
-            UserViewHolder(View itemView) {
-                super(itemView);
-                textUser = itemView.findViewById(R.id.text_message_user);
-            }
-        }
-
-        class BotViewHolder extends RecyclerView.ViewHolder {
-            TextView textBot;
-            BotViewHolder(View itemView) {
-                super(itemView);
-                textBot = itemView.findViewById(R.id.text_message_bot);
-            }
-        }
+        @Override public int getItemCount() { return messages.size(); }
+        class UserVH extends RecyclerView.ViewHolder { TextView t; UserVH(View v) { super(v); t = v.findViewById(R.id.text_message_user); } }
+        class BotVH extends RecyclerView.ViewHolder { TextView t; BotVH(View v) { super(v); t = v.findViewById(R.id.text_message_bot); } }
     }
 }

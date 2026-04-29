@@ -22,9 +22,11 @@ public class ApiClient {
             "Gdy dodajesz zadanie, domyślaj się brakujących parametrów na podstawie kontekstu lub ustaw rozsądne wartości domyślne.";
 
     private static final String SORTING_SYSTEM_INSTRUCTION =
-            "Schedule tasks using: Dependencies (task after its dependency) Priority: H > R (if due today) > E, " +
+            "Schedule tasks using: Dependencies (task after its dependency), Priority: H > R (if due today) > E, " +
             "with L like E but earlier if large vs time to deadline R only if last_done + interval ≤ today " +
-            "Earlier deadline = higher priority Tie-breaker: lower “fun” first Return ONLY JSON: { \"order\": [task_ids_in_order] }";
+            "Earlier deadline = higher priority Tie-breaker: lower coolness first. " +
+            "types: H - hard, E - elastic, R - recurring, L - large, D - dependent " +
+            "Return ONLY JSON: { \"order\": [task_ids_in_order] }";
     private static final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)

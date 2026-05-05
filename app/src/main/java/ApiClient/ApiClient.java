@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
 
-    private static final String API_KEY = "AIzaSyCCmwzoVGufTvvQfK64b8sIygiEs4TxFzI";
+    private static final String API_KEY = "";
     private static final String MODEL_NAME = "gemini-2.5-flash-lite";
 
     private static final String SYSTEM_INSTRUCTION = 

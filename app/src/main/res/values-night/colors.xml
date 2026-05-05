@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Chat Colors (Night Mode) -->
+    <color name="app_bg">#121212</color>
+    <color name="chat_bot_bg">#312B3D</color>
+    <color name="chat_bot_text">#E1D5F9</color>
+    <color name="chat_user_bg">#D0BCFF</color>
+    <color name="chat_user_text">#381E72</color>
+    <color name="input_bg">#1C1B1F</color>
+    <color name="input_text">#E1D5F9</color>
+
+    <color name="tab_indicator">#D0BCFF</color>
+    <color name="tab_text_selected">#D0BCFF</color>
+    <color name="tab_text_default">#CAC4D0</color>
+</resources>

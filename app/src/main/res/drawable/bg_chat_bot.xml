@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#E1D5F9" />
+    <solid android:color="@color/chat_bot_bg" />
     <corners
         android:bottomLeftRadius="2dp"
         android:topLeftRadius="16dp"

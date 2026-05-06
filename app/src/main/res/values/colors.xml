@@ -2,4 +2,20 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- App Background -->
+    <color name="app_bg">#FFFFFF</color>
+
+    <!-- Chat Colors (Light Mode) -->
+    <color name="chat_bot_bg">#F0EAFB</color>
+    <color name="chat_bot_text">#1C1B1F</color>
+    <color name="chat_user_bg">#6750A4</color>
+    <color name="chat_user_text">#FFFFFF</color>
+    <color name="input_bg">#F3F3F3</color>
+    <color name="input_text">#1C1B1F</color>
+
+    <!-- Tabs Visibility -->
+    <color name="tab_indicator">#6750A4</color>
+    <color name="tab_text_selected">#6750A4</color>
+    <color name="tab_text_default">#49454F</color>
 </resources>

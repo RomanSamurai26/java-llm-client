@@ -1,7 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.MyApplication" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <item name="android:windowBackground">@color/app_bg</item>
+        <item name="colorPrimary">@color/chat_user_bg</item>
+        <item name="colorSurface">@color/app_bg</item>
+        <item name="colorOnSurface">@color/chat_bot_text</item>
+        <item name="colorOnSurfaceVariant">@color/tab_text_default</item>
+        <item name="colorOutline">@color/tab_text_default</item>
     </style>
 </resources>

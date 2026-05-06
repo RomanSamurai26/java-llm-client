@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,8 +27,15 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+
+import ApiClient.ApiClient;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
 
 public class SecondFragment extends Fragment {
 
@@ -109,7 +117,11 @@ public class SecondFragment extends Fragment {
                 return;
             }
 
-            int id = taskList.isEmpty() ? 1 : taskList.get(taskList.size() - 1).id + 1;
+            int maxId = 0;
+            for (Task t : taskList) {
+                if (t.id > maxId) maxId = t.id;
+            }
+            int id = maxId + 1;
             int coolness = coolnessStr.isEmpty() ? 3 : Integer.parseInt(coolnessStr);
             int time = timeStr.isEmpty() ? 0 : Integer.parseInt(timeStr);
 
@@ -124,7 +136,109 @@ public class SecondFragment extends Fragment {
                 NavHostFragment.findNavController(SecondFragment.this)
                         .navigate(R.id.action_SecondFragment_to_FirstFragment)
         );
+        binding.sortTasksButton.setOnClickListener(v -> {
+            binding.errorMessage.setVisibility(View.GONE);
+            binding.sortTasksButton.setEnabled(false);
+            String today = new SimpleDateFormat("dd-MM-yyyy").format(new Date());
+            String fullPrompt = " Today: " + today +" Tasks: " +tasksToJSON();
+
+            ApiClient.sendSortingPrompt(fullPrompt, new Callback() {
+                @Override
+                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            binding.errorMessage.setVisibility(View.VISIBLE);
+                            String errorMessage = "Błąd połączenia: " + e.getMessage();
+                            binding.errorMessage.setText(errorMessage);
+                            binding.sortTasksButton.setEnabled(true);
+                        });
+                    }
+                }
+
+                @Override
+                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                    try (Response resp = response) {
+                        String responseBody = resp.body().string();
+                        if (resp.isSuccessful()) {
+                            // wyciągnięcie tekstu z odpowiedzi AI
+                            JSONObject json = new JSONObject(responseBody);
+                            String rawText = json.getJSONArray("candidates")
+                                    .getJSONObject(0)
+                                    .getJSONObject("content")
+                                    .getJSONArray("parts")
+                                    .getJSONObject(0)
+                                    .getString("text");
+
+                            processModelSorting(rawText);
+                        } else {
+                            if (getActivity() != null) {
+                                getActivity().runOnUiThread(() -> {
+                                    binding.errorMessage.setVisibility(View.VISIBLE);
+                                    String errorMessage = "Błąd serwera (kod " + resp.code();
+                                    binding.errorMessage.setText(errorMessage);
+                                    binding.sortTasksButton.setEnabled(true);
+                                });
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                binding.errorMessage.setVisibility(View.VISIBLE);
+                                String errorMessage = "Błąd przetwarzania: " + e.getMessage();
+                                binding.errorMessage.setText(errorMessage);
+                                binding.sortTasksButton.setEnabled(true);
+                            });
+                        }
+                    }
+                }
+            });
+        });
     }
+
+    private void processModelSorting(String rawText) {
+        if (getActivity() == null) return;
+        getActivity().runOnUiThread(() -> {
+            try {
+                // 1. Wyciągamy same liczby i przecinki (usuwamy { } i inny tekst)
+                String cleaned = rawText.replaceAll("[^0-9,]", "");
+                String[] idStrings = cleaned.split(",");
+
+                List<Task> sortedList = new ArrayList<>();
+                 // 2. Dopasowujemy taski z obecnej listy do ID zwróconych przez AI
+                for (String idStr : idStrings) {
+                    if (idStr.trim().isEmpty()) continue;
+                    int id = Integer.parseInt(idStr.trim());
+
+                    for (Task t : taskList) {
+                        if (t.id == id) {
+                            sortedList.add(t);
+                            break;
+                        }
+                    }
+                }
+
+                // 3. Dodajemy brakujące zadania (jeśli AI o jakimś zapomniało)
+                for (Task t : taskList) {
+                    if (!sortedList.contains(t)) {
+                        sortedList.add(t);
+                    }
+                }
+
+                // 4. Odświeżamy listę i UI
+                taskList.clear();
+                taskList.addAll(sortedList);
+                adapter.notifyDataSetChanged();
+                saveTasks();
+
+            } catch (Exception e) {
+                binding.errorMessage.setVisibility(View.VISIBLE);
+                binding.errorMessage.setText("Błąd podczas sortowania: " + e.getMessage());
+            } finally {
+                binding.sortTasksButton.setEnabled(true);
+            }
+        });
+    }
+
 
     private void clearInputs() {
         binding.etDesc.setText("");
@@ -134,15 +248,21 @@ public class SecondFragment extends Fragment {
         binding.etType.setText("");
         binding.etExtra.setText("");
     }
-
-    private void saveTasks() {
+    private String tasksToJSON() {
+        JSONArray jsonArray = new JSONArray();
         try {
-            JSONArray jsonArray = new JSONArray();
             for (Task t : taskList) {
                 jsonArray.put(t.toJSON());
             }
+        } catch (Exception e) { e.printStackTrace(); }
+        return jsonArray.toString();
+    }
+
+    private void saveTasks() {
+        try {
+            String jsonArray = tasksToJSON();
             try (FileOutputStream fos = requireContext().openFileOutput(TASKS_FILE, Context.MODE_PRIVATE)) {
-                fos.write(jsonArray.toString().getBytes(StandardCharsets.UTF_8));
+                fos.write(jsonArray.getBytes(StandardCharsets.UTF_8));
             }
         } catch (Exception e) { e.printStackTrace(); }
     }

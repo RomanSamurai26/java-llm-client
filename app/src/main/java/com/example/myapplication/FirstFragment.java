@@ -203,7 +203,7 @@ public class FirstFragment extends Fragment {
         
         tasks.add(newTask);
         saveAllTasks(tasks);
-        Toast.makeText(getContext(), "Lokaj dodał zadanie #" + newId, Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), "Lokaj dodał zadanie: " + newTask.description, Toast.LENGTH_SHORT).show();
     }
 
     private void deleteTaskFromAI(int taskId) throws Exception {
@@ -218,7 +218,7 @@ public class FirstFragment extends Fragment {
         }
         if (removed) {
             saveAllTasks(tasks);
-            Toast.makeText(getContext(), "Lokaj usunął zadanie #" + taskId, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Lokaj usunął zadanie.", Toast.LENGTH_SHORT).show();
         }
     }
 

@@ -12,7 +12,7 @@
         android:id="@+id/title_tasks"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Nowe Zadanie"
+        android:text="@string/new_task"
         android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="?attr/colorOnSurface"
@@ -77,7 +77,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:hint="Rodzaj zadania">
+                android:hint="@string/task_type">
 
                 <AutoCompleteTextView
                     android:id="@+id/et_type"
@@ -87,12 +87,22 @@
 
             </com.google.android.material.textfield.TextInputLayout>
 
-            <EditText
-                android:id="@+id/et_extra"
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_extra"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Dodatkowe info (czas/ID rodzica/itp)"
-                android:inputType="text" />
+                android:layout_marginTop="8dp"
+                android:hint="@string/extra_info"
+                android:visibility="gone">
+
+                <AutoCompleteTextView
+                    android:id="@+id/et_extra"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
         </LinearLayout>
     </ScrollView>
@@ -101,7 +111,7 @@
         android:id="@+id/button_add_task"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Dodaj Zadanie"
+        android:text="@string/add_task"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/form_container" />
@@ -150,7 +160,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Pokaż wykonane" />
+            android:text="@string/show_done" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

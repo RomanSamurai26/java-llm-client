@@ -1,11 +1,13 @@
 package com.example.myapplication;
 
+import android.app.DatePickerDialog;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.TextView;
 import android.widget.ImageButton;
 import android.widget.Toast;
@@ -29,8 +31,10 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import ApiClient.ApiClient;
 import okhttp3.Call;
@@ -42,7 +46,10 @@ public class SecondFragment extends Fragment {
     private FragmentSecondBinding binding;
     private TaskAdapter adapter;
     private final List<Task> taskList = new ArrayList<>();
+    private final List<Task> doneTaskList = new ArrayList<>();
+    private boolean showingDone = false;
     private static final String TASKS_FILE = "tasks.json";
+    private static final String DONE_TASKS_FILE = "done_tasks.json";
 
     // --- Klasa modelu zadania ---
     public static class Task {
@@ -99,22 +106,71 @@ public class SecondFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         loadTasks();
+        loadDoneTasks();
 
         adapter = new TaskAdapter(taskList);
         binding.recyclerViewTasks.setLayoutManager(new LinearLayoutManager(getContext()));
         binding.recyclerViewTasks.setAdapter(adapter);
+
+        binding.buttonToggleDone.setOnClickListener(v -> {
+            showingDone = !showingDone;
+            if (showingDone) {
+                binding.buttonToggleDone.setText("Pokaż aktywne");
+                binding.sortTasksButton.setEnabled(false);
+                binding.titleTasks.setText("Wykonane Zadania");
+                binding.formContainer.setVisibility(View.GONE);
+                binding.buttonAddTask.setVisibility(View.GONE);
+                adapter.setTasks(doneTaskList);
+            } else {
+                binding.buttonToggleDone.setText("Pokaż wykonane");
+                binding.sortTasksButton.setEnabled(true);
+                binding.titleTasks.setText("Nowe Zadanie");
+                binding.formContainer.setVisibility(View.VISIBLE);
+                binding.buttonAddTask.setVisibility(View.VISIBLE);
+                adapter.setTasks(taskList);
+            }
+        });
+
+        // Setup Task Type Dropdown
+        String[] types = {"Hard", "Elastic", "Recurring", "Dependent"};
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, types);
+        binding.etType.setAdapter(typeAdapter);
+        binding.etType.setText("Elastic", false); // Domyślna wartość
+
+        binding.etDeadline.setOnClickListener(v -> {
+            Calendar c = Calendar.getInstance();
+            int year = c.get(Calendar.YEAR);
+            int month = c.get(Calendar.MONTH);
+            int day = c.get(Calendar.DAY_OF_MONTH);
+
+            DatePickerDialog datePickerDialog = new DatePickerDialog(getContext(),
+                    (view1, year1, monthOfYear, dayOfMonth) -> {
+                        String selectedDate = String.format(Locale.getDefault(), "%02d-%02d-%04d", dayOfMonth, monthOfYear + 1, year1);
+                        binding.etDeadline.setText(selectedDate);
+                    }, year, month, day);
+            datePickerDialog.show();
+        });
 
         binding.buttonAddTask.setOnClickListener(v -> {
             String desc = binding.etDesc.getText().toString().trim();
             String deadline = binding.etDeadline.getText().toString().trim();
             String coolnessStr = binding.etCoolness.getText().toString().trim();
             String timeStr = binding.etTime.getText().toString().trim();
-            String type = binding.etType.getText().toString().trim();
+            String typeSelected = binding.etType.getText().toString().trim();
             String extra = binding.etExtra.getText().toString().trim();
 
             if (desc.isEmpty() || deadline.isEmpty()) {
                 Toast.makeText(getContext(), "Opis i Deadline są wymagane!", Toast.LENGTH_SHORT).show();
                 return;
+            }
+
+            String type = "";
+            switch (typeSelected) {
+                case "Hard": type = "H"; break;
+                case "Elastic": type = "E"; break;
+                case "Recurring": type = "R"; break;
+                case "Dependent": type = "D"; break;
+                default: type = "E"; break; // Domyślnie Elastic
             }
 
             int maxId = 0;
@@ -131,11 +187,6 @@ public class SecondFragment extends Fragment {
             saveTasks();
             clearInputs();
         });
-
-        binding.buttonSecond.setOnClickListener(v ->
-                NavHostFragment.findNavController(SecondFragment.this)
-                        .navigate(R.id.action_SecondFragment_to_FirstFragment)
-        );
         binding.sortTasksButton.setOnClickListener(v -> {
             binding.errorMessage.setVisibility(View.GONE);
             binding.sortTasksButton.setEnabled(false);
@@ -245,7 +296,7 @@ public class SecondFragment extends Fragment {
         binding.etDeadline.setText("");
         binding.etCoolness.setText("");
         binding.etTime.setText("");
-        binding.etType.setText("");
+        binding.etType.setText("Elastic", false);
         binding.etExtra.setText("");
     }
     private String tasksToJSON() {
@@ -259,17 +310,36 @@ public class SecondFragment extends Fragment {
     }
 
     private void saveTasks() {
+        saveListToFile(taskList, TASKS_FILE);
+    }
+
+    private void saveDoneTasks() {
+        saveListToFile(doneTaskList, DONE_TASKS_FILE);
+    }
+
+    private void saveListToFile(List<Task> list, String filename) {
         try {
-            String jsonArray = tasksToJSON();
-            try (FileOutputStream fos = requireContext().openFileOutput(TASKS_FILE, Context.MODE_PRIVATE)) {
-                fos.write(jsonArray.getBytes(StandardCharsets.UTF_8));
+            JSONArray jsonArray = new JSONArray();
+            for (Task t : list) {
+                jsonArray.put(t.toJSON());
+            }
+            try (FileOutputStream fos = requireContext().openFileOutput(filename, Context.MODE_PRIVATE)) {
+                fos.write(jsonArray.toString().getBytes(StandardCharsets.UTF_8));
             }
         } catch (Exception e) { e.printStackTrace(); }
     }
 
     private void loadTasks() {
-        taskList.clear();
-        try (FileInputStream fis = requireContext().openFileInput(TASKS_FILE);
+        loadListFromFile(taskList, TASKS_FILE);
+    }
+
+    private void loadDoneTasks() {
+        loadListFromFile(doneTaskList, DONE_TASKS_FILE);
+    }
+
+    private void loadListFromFile(List<Task> list, String filename) {
+        list.clear();
+        try (FileInputStream fis = requireContext().openFileInput(filename);
              InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
              BufferedReader reader = new BufferedReader(isr)) {
             StringBuilder sb = new StringBuilder();
@@ -277,7 +347,7 @@ public class SecondFragment extends Fragment {
             while ((line = reader.readLine()) != null) sb.append(line);
             JSONArray jsonArray = new JSONArray(sb.toString());
             for (int i = 0; i < jsonArray.length(); i++) {
-                taskList.add(Task.fromJSON(jsonArray.getJSONObject(i)));
+                list.add(Task.fromJSON(jsonArray.getJSONObject(i)));
             }
         } catch (IOException ignored) {} catch (Exception e) { e.printStackTrace(); }
     }
@@ -289,8 +359,13 @@ public class SecondFragment extends Fragment {
     }
 
     private class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
-        private final List<Task> tasks;
+        private List<Task> tasks;
         public TaskAdapter(List<Task> tasks) { this.tasks = tasks; }
+
+        public void setTasks(List<Task> newTasks) {
+            this.tasks = newTasks;
+            notifyDataSetChanged();
+        }
 
         @NonNull
         @Override
@@ -305,12 +380,40 @@ public class SecondFragment extends Fragment {
             holder.tvId.setText("#" + task.id);
             holder.tvDesc.setText(task.description);
             holder.tvDeadline.setText("Deadline: " + task.deadline);
+
+            if (showingDone) {
+                holder.doneBtn.setImageResource(android.R.drawable.ic_menu_revert);
+                holder.doneBtn.setColorFilter(getResources().getColor(android.R.color.holo_orange_dark, null));
+            } else {
+                holder.doneBtn.setImageResource(android.R.drawable.checkbox_on_background);
+                holder.doneBtn.setColorFilter(getResources().getColor(android.R.color.holo_green_dark, null));
+            }
+
+            holder.doneBtn.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) {
+                    Task t = tasks.remove(pos);
+                    notifyItemRemoved(pos);
+                    if (showingDone) {
+                        taskList.add(t);
+                    } else {
+                        doneTaskList.add(0, t);
+                    }
+                    saveTasks();
+                    saveDoneTasks();
+                }
+            });
+
             holder.deleteBtn.setOnClickListener(v -> {
                 int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
                     tasks.remove(pos);
                     notifyItemRemoved(pos);
-                    saveTasks();
+                    if (showingDone) {
+                        saveDoneTasks();
+                    } else {
+                        saveTasks();
+                    }
                 }
             });
         }
@@ -320,13 +423,14 @@ public class SecondFragment extends Fragment {
 
         class TaskViewHolder extends RecyclerView.ViewHolder {
             TextView tvId, tvDesc, tvDeadline;
-            ImageButton deleteBtn;
+            ImageButton deleteBtn, doneBtn;
             public TaskViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvId = itemView.findViewById(R.id.tv_task_id);
                 tvDesc = itemView.findViewById(R.id.tv_task_description);
                 tvDeadline = itemView.findViewById(R.id.tv_task_deadline);
                 deleteBtn = itemView.findViewById(R.id.button_delete_task);
+                doneBtn = itemView.findViewById(R.id.button_done_task);
             }
         }
     }

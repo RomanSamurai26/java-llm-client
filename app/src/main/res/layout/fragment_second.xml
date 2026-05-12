@@ -19,6 +19,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+
     <ScrollView
         android:id="@+id/form_container"
         android:layout_width="0dp"
@@ -44,8 +45,10 @@
                 android:id="@+id/et_deadline"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Deadline (dd-mm-yyyy)"
-                android:inputType="date" />
+                android:hint="Deadline"
+                android:inputType="none"
+                android:focusable="false"
+                android:clickable="true" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -69,12 +72,20 @@
                     android:inputType="number" />
             </LinearLayout>
 
-            <EditText
-                android:id="@+id/et_type"
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Rodzaj (H, E, R, L, D)"
-                android:inputType="textCapCharacters" />
+                android:layout_marginTop="8dp"
+                android:hint="Rodzaj zadania">
+
+                <AutoCompleteTextView
+                    android:id="@+id/et_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <EditText
                 android:id="@+id/et_extra"
@@ -121,7 +132,7 @@
     <LinearLayout
         android:id="@+id/button_container"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -129,17 +140,17 @@
 
         <Button
             android:id="@+id/sort_tasks_button"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Sortuj taski" />
 
         <Button
-            android:id="@+id/button_second"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:id="@+id/button_toggle_done"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Powrót do AI" />
+            android:text="Pokaż wykonane" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

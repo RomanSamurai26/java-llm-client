@@ -47,6 +47,15 @@
         </LinearLayout>
 
         <ImageButton
+            android:id="@+id/button_done_task"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/checkbox_on_background"
+            android:layout_marginEnd="8dp"
+            app:tint="@android:color/holo_green_dark" />
+
+        <ImageButton
             android:id="@+id/button_delete_task"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

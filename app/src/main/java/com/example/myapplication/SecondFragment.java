@@ -48,6 +48,7 @@ public class SecondFragment extends Fragment {
     private final List<Task> taskList = new ArrayList<>();
     private final List<Task> doneTaskList = new ArrayList<>();
     private boolean showingDone = false;
+    private Task taskToEdit = null;
     private static final String TASKS_FILE = "tasks.json";
     private static final String DONE_TASKS_FILE = "done_tasks.json";
 
@@ -114,6 +115,7 @@ public class SecondFragment extends Fragment {
 
         binding.buttonToggleDone.setOnClickListener(v -> {
             showingDone = !showingDone;
+            hideKeyboard();
             if (showingDone) {
                 binding.buttonToggleDone.setText(R.string.show_active);
                 binding.sortTasksButton.setEnabled(false);
@@ -178,34 +180,56 @@ public class SecondFragment extends Fragment {
                 case "Recurring": type = "R"; break;
                 case "Large":
                     type = "L";
-                    finalExtra = "0/" + extra; // Format: aktualny_krok/wszystkie
+                    if (taskToEdit != null && "L".equals(taskToEdit.type)) {
+                        // Jeśli edytujemy Large, zachowaj postęp
+                        String[] oldParts = taskToEdit.extraInfo.split("/");
+                        finalExtra = oldParts[0] + "/" + extra;
+                    } else {
+                        finalExtra = "0/" + extra;
+                    }
                     break;
                 case "Dependent":
                     type = "D";
-                    // Pobieramy ID zapisane w Tagu podczas wyboru z listy
                     Object tag = binding.etExtra.getTag();
                     if (tag != null) {
                         finalExtra = tag.toString();
+                    } else if (taskToEdit != null && "D".equals(taskToEdit.type)) {
+                        finalExtra = taskToEdit.extraInfo;
                     }
                     break;
                 default: type = "E"; break; // Domyślnie Elastic
             }
 
-            int maxId = 0;
-            for (Task t : taskList) {
-                if (t.id > maxId) maxId = t.id;
-            }
-            int id = maxId + 1;
             int coolness = coolnessStr.isEmpty() ? 3 : Integer.parseInt(coolnessStr);
             int time = timeStr.isEmpty() ? 0 : Integer.parseInt(timeStr);
 
-            Task newTask = new Task(id, desc, deadline, coolness, time, type, finalExtra);
-            taskList.add(newTask);
-            adapter.notifyItemInserted(taskList.size() - 1);
+            if (taskToEdit != null) {
+                taskToEdit.description = desc;
+                taskToEdit.deadline = deadline;
+                taskToEdit.coolness = coolness;
+                taskToEdit.estimatedTime = time;
+                taskToEdit.type = type;
+                taskToEdit.extraInfo = finalExtra;
+                
+                int index = taskList.indexOf(taskToEdit);
+                if (index != -1) {
+                    adapter.notifyItemChanged(index);
+                }
+                taskToEdit = null;
+                binding.buttonAddTask.setText(R.string.add_task);
+                binding.titleTasks.setText(R.string.new_task);
+            } else {
+                int id = getNextId();
+                Task newTask = new Task(id, desc, deadline, coolness, time, type, finalExtra);
+                taskList.add(newTask);
+                adapter.notifyItemInserted(taskList.size() - 1);
+            }
             saveTasks();
             clearInputs();
+            hideKeyboard();
         });
         binding.sortTasksButton.setOnClickListener(v -> {
+            hideKeyboard();
             binding.errorMessage.setVisibility(View.GONE);
             binding.sortTasksButton.setEnabled(false);
             String today = new SimpleDateFormat("dd-MM-yyyy").format(new Date());
@@ -268,18 +292,27 @@ public class SecondFragment extends Fragment {
         if (getActivity() == null) return;
         getActivity().runOnUiThread(() -> {
             try {
-                String[] idStrings;
-                // 1. Wyciągamy same liczby i przecinki (usuwamy { } i inny tekst)
-                String cleaned = rawText.replaceAll("[^0-9,]", " ").trim();
-                // Dodatkowo obsługujemy format JSON { "order": [1, 2, 3] } jeśli AI go zwróci
-                if (rawText.contains("\"order\"")) {
-                    JSONObject jsonResp = new JSONObject(rawText);
-                    JSONArray orderArray = jsonResp.getJSONArray("order");
-                    idStrings = new String[orderArray.length()];
-                    for (int i = 0; i < orderArray.length(); i++) {
-                        idStrings[i] = String.valueOf(orderArray.get(i));
+                String jsonContent = rawText;
+                if (rawText.contains("{")) {
+                    jsonContent = rawText.substring(rawText.indexOf("{"), rawText.lastIndexOf("}") + 1);
+                }
+
+                String[] idStrings = null;
+                if (jsonContent.contains("\"order\"")) {
+                    try {
+                        JSONObject jsonResp = new JSONObject(jsonContent);
+                        JSONArray orderArray = jsonResp.getJSONArray("order");
+                        idStrings = new String[orderArray.length()];
+                        for (int i = 0; i < orderArray.length(); i++) {
+                            idStrings[i] = String.valueOf(orderArray.get(i));
+                        }
+                    } catch (Exception e) {
+                        // Fallback if JSON parsing fails
                     }
-                } else {
+                }
+
+                if (idStrings == null) {
+                    String cleaned = jsonContent.replaceAll("[^0-9,]", " ").trim();
                     idStrings = cleaned.split("\\s*,\\s*|\\s+");
                 }
 
@@ -287,14 +320,17 @@ public class SecondFragment extends Fragment {
                  // 2. Dopasowujemy taski z obecnej listy do ID zwróconych przez AI
                 for (String idStr : idStrings) {
                     if (idStr.trim().isEmpty()) continue;
-                    int id = Integer.parseInt(idStr.trim());
-
-                    for (Task t : taskList) {
-                        if (t.id == id) {
-                            sortedList.add(t);
-                            break;
+                    try {
+                        int id = Integer.parseInt(idStr.trim());
+                        for (Task t : taskList) {
+                            if (t.id == id) {
+                                if (!sortedList.contains(t)) {
+                                    sortedList.add(t);
+                                }
+                                break;
+                            }
                         }
-                    }
+                    } catch (NumberFormatException ignored) {}
                 }
 
                 // 3. Dodajemy brakujące zadania (jeśli AI o jakimś zapomniało)
@@ -322,27 +358,34 @@ public class SecondFragment extends Fragment {
 
     private void handleRecurringTask(Task t) {
         try {
-            int days = Integer.parseInt(t.extraInfo);
+            if (t.extraInfo == null || t.extraInfo.trim().isEmpty()) {
+                return;
+            }
+            int days = Integer.parseInt(t.extraInfo.trim());
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy", Locale.getDefault());
             Calendar c = Calendar.getInstance();
             
             // Parsujemy obecny deadline i dodajemy X dni
-            c.setTime(sdf.parse(t.deadline));
+            Date currentDeadlineDate = sdf.parse(t.deadline);
+            if (currentDeadlineDate == null) return;
+            c.setTime(currentDeadlineDate);
             c.add(Calendar.DAY_OF_YEAR, days);
             String newDeadline = sdf.format(c.getTime());
 
             // Szukamy najwyższego ID
-            int maxId = 0;
-            for (Task task : taskList) if (task.id > maxId) maxId = task.id;
-            for (Task task : doneTaskList) if (task.id > maxId) maxId = task.id;
+            int id = getNextId();
 
             // Tworzymy nową instancję zadania
-            Task newTask = new Task(maxId + 1, t.description, newDeadline, t.coolness, t.estimatedTime, t.type, t.extraInfo);
+            Task newTask = new Task(id, t.description, newDeadline, t.coolness, t.estimatedTime, t.type, t.extraInfo);
             taskList.add(newTask);
             
             // Jeśli obecnie wyświetlamy aktywne zadania, odświeżamy adapter
             if (!showingDone) {
                 adapter.notifyItemInserted(taskList.size() - 1);
+            }
+        } catch (NumberFormatException e) {
+            if (getContext() != null) {
+                Toast.makeText(getContext(), "Błąd: Nieprawidłowa liczba dni w zadaniu cyklicznym.", Toast.LENGTH_SHORT).show();
             }
         } catch (Exception e) {
             e.printStackTrace(); // W razie błędu w extraInfo (brak liczby) po prostu nie odnawiamy
@@ -379,6 +422,13 @@ public class SecondFragment extends Fragment {
         }
     }
 
+    private int getNextId() {
+        int maxId = 0;
+        for (Task t : taskList) if (t.id > maxId) maxId = t.id;
+        for (Task t : doneTaskList) if (t.id > maxId) maxId = t.id;
+        return maxId + 1;
+    }
+
     private void clearInputs() {
         binding.etDesc.setText("");
         binding.etDeadline.setText("");
@@ -389,6 +439,17 @@ public class SecondFragment extends Fragment {
         binding.etExtra.setTag(null);
         binding.tilExtra.setVisibility(View.GONE);
     }
+
+    private void hideKeyboard() {
+        View view = getView();
+        if (view != null) {
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+            }
+        }
+    }
+
     private String tasksToJSON() {
         JSONArray jsonArray = new JSONArray();
         try {
@@ -467,6 +528,50 @@ public class SecondFragment extends Fragment {
         @Override
         public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
             Task task = tasks.get(position);
+            
+            holder.itemView.setOnClickListener(v -> {
+                if (showingDone) return; // Nie edytujemy ukończonych
+                
+                taskToEdit = task;
+                binding.etDesc.setText(task.description);
+                binding.etDeadline.setText(task.deadline);
+                binding.etCoolness.setText(String.valueOf(task.coolness));
+                binding.etTime.setText(String.valueOf(task.estimatedTime));
+                
+                String typeName = "";
+                switch (task.type) {
+                    case "H": typeName = "Hard"; break;
+                    case "E": typeName = "Elastic"; break;
+                    case "R": typeName = "Recurring"; break;
+                    case "D": typeName = "Dependent"; break;
+                    case "L": typeName = "Large"; break;
+                }
+                binding.etType.setText(typeName, false);
+                updateExtraFieldVisibility(typeName);
+                
+                if ("L".equals(task.type)) {
+                    String[] parts = task.extraInfo.split("/");
+                    binding.etExtra.setText(parts[1]); // Pokaż całkowitą liczbę kroków
+                } else if ("D".equals(task.type)) {
+                    // Dla Dependent szukamy nazwy rodzica
+                    int parentId = -1;
+                    try { parentId = Integer.parseInt(task.extraInfo); } catch (Exception e) {}
+                    for (Task t : taskList) {
+                        if (t.id == parentId) {
+                            binding.etExtra.setText(t.description, false);
+                            binding.etExtra.setTag(t.id);
+                            break;
+                        }
+                    }
+                } else {
+                    binding.etExtra.setText(task.extraInfo);
+                }
+                
+                binding.buttonAddTask.setText(R.string.save_task);
+                binding.titleTasks.setText(R.string.edit_task);
+                binding.formContainer.fullScroll(View.FOCUS_UP);
+            });
+
             String desc = task.description;
             if ("L".equals(task.type)) {
                 desc += " (" + task.extraInfo + ")";
@@ -490,17 +595,28 @@ public class SecondFragment extends Fragment {
                     if (!showingDone && "L".equals(t.type)) {
                         // Obsługa zadania Large - zwiększamy postęp
                         try {
-                            String[] parts = t.extraInfo.split("/");
-                            int current = Integer.parseInt(parts[0]) + 1;
-                            int total = Integer.parseInt(parts[1]);
-                            
-                            if (current < total) {
-                                t.extraInfo = current + "/" + total;
-                                notifyItemChanged(pos);
-                                saveTasks();
-                                return; // Nie usuwamy zadania jeszcze
+                            String info = t.extraInfo;
+                            if (info != null && info.contains("/")) {
+                                String[] parts = info.split("/");
+                                if (parts.length == 2) {
+                                    int current = Integer.parseInt(parts[0].trim()) + 1;
+                                    int total = Integer.parseInt(parts[1].trim());
+
+                                    if (current < total) {
+                                        t.extraInfo = current + "/" + total;
+                                        notifyItemChanged(pos);
+                                        saveTasks();
+                                        return; // Nie usuwamy zadania jeszcze
+                                    }
+                                }
                             }
-                        } catch (Exception e) { e.printStackTrace(); }
+                        } catch (NumberFormatException e) {
+                            if (getContext() != null) {
+                                Toast.makeText(getContext(), "Błąd formatu zadania Large.", Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
 
                     if (!showingDone && "D".equals(t.type)) {

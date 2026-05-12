@@ -51,6 +51,8 @@
     <string name="large_hint">Liczba etapów</string>
     <string name="dependent_hint">Wybierz zadanie nadrzędne</string>
     <string name="add_task">Dodaj Zadanie</string>
+    <string name="save_task">Zapisz Zadanie</string>
+    <string name="edit_task">Edytuj Zadanie</string>
     <string name="show_done">Pokaż wykonane</string>
     <string name="show_active">Pokaż aktywne</string>
     <string name="new_task">Nowe Zadanie</string>

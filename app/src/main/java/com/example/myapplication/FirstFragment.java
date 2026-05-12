@@ -77,9 +77,11 @@ public class FirstFragment extends Fragment {
             addMessage(new ChatMessage(userPrompt, true));
             binding.edittextPrompt.setText("");
             binding.buttonFirst.setEnabled(false);
+            hideKeyboard();
 
+            String currentDate = new java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.getDefault()).format(new java.util.Date());
             String tasksContext = loadTasksForContext();
-            String fullPrompt = "KONTEKST ZADAŃ:\n" + tasksContext + "\n\nPYTANIE: " + userPrompt;
+            String fullPrompt = "DZISIEJSZA DATA: " + currentDate + "\n\nKONTEKST ZADAŃ:\n" + tasksContext + "\n\nPYTANIE: " + userPrompt;
 
             ApiClient.sendPrompt(fullPrompt, new Callback() {
                 @Override
@@ -189,21 +191,46 @@ public class FirstFragment extends Fragment {
 
     private void addTaskFromAI(JSONObject taskJson) throws Exception {
         List<SecondFragment.Task> tasks = loadAllTasks();
-        int newId = tasks.isEmpty() ? 1 : tasks.get(tasks.size() - 1).id + 1;
+        List<SecondFragment.Task> doneTasks = loadDoneTasks();
+        
+        int maxId = 0;
+        for (SecondFragment.Task t : tasks) if (t.id > maxId) maxId = t.id;
+        for (SecondFragment.Task t : doneTasks) if (t.id > maxId) maxId = t.id;
+        int newId = maxId + 1;
+
+        String type = taskJson.optString("type", "E");
+        String extraInfo = taskJson.optString("extraInfo", "");
+
+        // Walidacja i formatowanie extraInfo dla specyficznych typów
+        if ("R".equals(type)) {
+            // Dla Recurring extraInfo musi być liczbą dni
+            if (extraInfo.isEmpty() || !extraInfo.matches("\\d+")) {
+                extraInfo = "7"; // Domyślnie tydzień
+            }
+        } else if ("L".equals(type)) {
+            // Dla Large extraInfo powinno być "current/total"
+            if (!extraInfo.contains("/")) {
+                if (extraInfo.matches("\\d+")) {
+                    extraInfo = "0/" + extraInfo;
+                } else {
+                    extraInfo = "0/3"; // Domyślnie 3 kroki
+                }
+            }
+        }
         
         SecondFragment.Task newTask = new SecondFragment.Task(
             newId,
             taskJson.optString("description", "Bez opisu"),
-            taskJson.optString("deadline", "dd-mm-yyyy"),
+            taskJson.optString("deadline", "dd-MM-yyyy"),
             taskJson.optInt("coolness", 3),
             taskJson.optInt("estimatedTime", 0),
-            taskJson.optString("type", "E"),
-            taskJson.optString("extraInfo", "")
+            type,
+            extraInfo
         );
         
         tasks.add(newTask);
         saveAllTasks(tasks);
-        Toast.makeText(getContext(), "Lokaj dodał zadanie #" + newId, Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), "Lokaj dodał zadanie: " + newTask.description, Toast.LENGTH_SHORT).show();
     }
 
     private void deleteTaskFromAI(int taskId) throws Exception {
@@ -218,8 +245,34 @@ public class FirstFragment extends Fragment {
         }
         if (removed) {
             saveAllTasks(tasks);
-            Toast.makeText(getContext(), "Lokaj usunął zadanie #" + taskId, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Lokaj usunął zadanie.", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void hideKeyboard() {
+        View view = getView();
+        if (view != null) {
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+            }
+        }
+    }
+
+    private List<SecondFragment.Task> loadDoneTasks() {
+        List<SecondFragment.Task> list = new ArrayList<>();
+        try (FileInputStream fis = requireContext().openFileInput("done_tasks.json");
+             InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+             BufferedReader reader = new BufferedReader(isr)) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            JSONArray arr = new JSONArray(sb.toString());
+            for (int i = 0; i < arr.length(); i++) {
+                list.add(SecondFragment.Task.fromJSON(arr.getJSONObject(i)));
+            }
+        } catch (Exception ignored) {}
+        return list;
     }
 
     private List<SecondFragment.Task> loadAllTasks() {

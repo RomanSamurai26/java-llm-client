@@ -44,4 +44,32 @@
         libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
         vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
     </string>
+
+    <string name="task_type">Rodzaj zadania</string>
+    <string name="extra_info">Dodatkowe info</string>
+    <string name="recurring_hint">Częstotliwość w dniach</string>
+    <string name="large_hint">Liczba etapów</string>
+    <string name="dependent_hint">Wybierz zadanie nadrzędne</string>
+    <string name="add_task">Dodaj Zadanie</string>
+    <string name="save_task">Zapisz Zadanie</string>
+    <string name="edit_task">Edytuj Zadanie</string>
+    <string name="show_done">Pokaż wykonane</string>
+    <string name="show_active">Pokaż aktywne</string>
+    <string name="new_task">Nowe Zadanie</string>
+    <string name="done_tasks">Wykonane Zadania</string>
+
+    <string-array name="task_types">
+        <item>Hard</item>
+        <item>Elastic</item>
+        <item>Recurring</item>
+        <item>Dependent</item>
+        <item>Large</item>
+    </string-array>
+
+    <string name="error_required">Opis i Deadline są wymagane!</string>
+    <string name="error_connection">Błąd połączenia: %1$s</string>
+    <string name="error_server">Błąd serwera (kod %1$d)</string>
+    <string name="error_processing">Błąd przetwarzania: %1$s</string>
+    <string name="error_sorting">Błąd podczas sortowania: %1$s</string>
+    <string name="parent_not_done">Najpierw ukończ zadanie nadrzędne!</string>
 </resources>

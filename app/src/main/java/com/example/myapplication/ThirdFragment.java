@@ -222,8 +222,6 @@ public class ThirdFragment extends Fragment {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             SecondFragment.Task task = tasks.get(position);
-            holder.tvId.setText("zad " + task.id);
-            holder.tvId.setTextColor(Color.BLACK);
             holder.tvDesc.setText(task.description);
             holder.tvDesc.setTextColor(Color.BLACK);
         }
@@ -232,10 +230,9 @@ public class ThirdFragment extends Fragment {
         public int getItemCount() { return tasks.size(); }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvId, tvDesc;
+            TextView tvDesc;
             public ViewHolder(@NonNull View v) {
                 super(v);
-                tvId = v.findViewById(R.id.tv_cal_task_id);
                 tvDesc = v.findViewById(R.id.tv_cal_task_desc);
             }
         }

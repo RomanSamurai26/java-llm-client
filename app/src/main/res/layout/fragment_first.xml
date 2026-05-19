@@ -110,6 +110,16 @@
             android:paddingEnd="12dp" />
 
         <ImageButton
+            android:id="@+id/button_stt"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Mowa na tekst"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_btn_speak_now"
+            app:tint="@color/chat_user_bg" />
+
+        <ImageButton
             android:id="@+id/button_first"
             android:layout_width="48dp"
             android:layout_height="48dp"

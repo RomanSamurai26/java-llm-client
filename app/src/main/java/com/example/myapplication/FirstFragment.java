@@ -1,13 +1,18 @@
 package com.example.myapplication;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
+import android.speech.RecognizerIntent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -31,6 +36,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class FirstFragment extends Fragment {
 
@@ -40,6 +46,18 @@ public class FirstFragment extends Fragment {
     private static final String CHAT_FILE = "chat_history.json";
     private static final String TASKS_FILE = "tasks.json";
     private boolean useSay1 = true;
+
+    private final ActivityResultLauncher<Intent> sttLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    ArrayList<String> matches = result.getData().getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    if (matches != null && !matches.isEmpty()) {
+                        binding.edittextPrompt.setText(matches.get(0));
+                    }
+                }
+            }
+    );
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -63,6 +81,8 @@ public class FirstFragment extends Fragment {
         if (!chatMessages.isEmpty()) {
             binding.scrollViewChat.post(() -> binding.scrollViewChat.fullScroll(View.FOCUS_DOWN));
         }
+
+        binding.buttonStt.setOnClickListener(v -> startSpeechToText());
 
         binding.buttonFirst.setOnClickListener(v -> {
             String userPrompt = binding.edittextPrompt.getText().toString().trim();
@@ -97,8 +117,8 @@ public class FirstFragment extends Fragment {
                 @Override
                 public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                     try (Response resp = response) {
-                        String responseBody = resp.body().string();
                         if (resp.isSuccessful()) {
+                            String responseBody = resp.body().string();
                             JSONObject json = new JSONObject(responseBody);
                             String rawText = json.getJSONArray("candidates")
                                     .getJSONObject(0)
@@ -110,9 +130,10 @@ public class FirstFragment extends Fragment {
                             processModelResponse(rawText);
                         } else {
                             if (getActivity() != null) {
+                                int code = resp.code();
                                 getActivity().runOnUiThread(() -> {
                                     binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
-                                    addMessage(new ChatMessage("Błąd serwera (kod " + resp.code() + ").", false));
+                                    addMessage(new ChatMessage(getErrorMessage(code), false));
                                     binding.buttonFirst.setEnabled(true);
                                 });
                             }
@@ -129,6 +150,37 @@ public class FirstFragment extends Fragment {
                 }
             });
         });
+    }
+
+    private String getErrorMessage(int code) {
+        switch (code) {
+            case 401:
+                return "Wygląda na to, że klucz dostępu jest nieważny.";
+            case 403:
+                return "Dostęp został zabroniony.";
+            case 404:
+                return "Nie znaleziono serwera lub modelu.";
+            case 429:
+                return "Przekroczono limit zapytań. Proszę spróbować później.";
+            case 500:
+                return "Błąd wewnętrzny serwera AI.";
+            case 503:
+                return "Usługa AI jest chwilowo niedostępna.";
+            default:
+                return "Wystąpił nieoczekiwany błąd serwera (kod: " + code + ").";
+        }
+    }
+
+    private void startSpeechToText() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Mów teraz...");
+        try {
+            sttLauncher.launch(intent);
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "Twoje urządzenie nie obsługuje rozpoznawania mowy.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void updateBotPresence(boolean isNewBotMessage) {

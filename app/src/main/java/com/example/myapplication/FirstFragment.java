@@ -58,10 +58,10 @@ public class FirstFragment extends Fragment {
 
         // Ustawienie początkowego zdjęcia Sebastiana
         binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
-        updateBotPresence(false); // Nie zmieniaj obrazka przy starcie, tylko pokaż dymek
+        updateBotPresence(false);
 
         if (!chatMessages.isEmpty()) {
-            binding.recyclerViewChat.scrollToPosition(chatMessages.size() - 1);
+            binding.scrollViewChat.post(() -> binding.scrollViewChat.fullScroll(View.FOCUS_DOWN));
         }
 
         binding.buttonFirst.setOnClickListener(v -> {
@@ -71,7 +71,6 @@ public class FirstFragment extends Fragment {
                 return;
             }
 
-            // Użytkownik wysyła prompt - Sebastian myśli
             binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_think);
 
             addMessage(new ChatMessage(userPrompt, true));
@@ -145,7 +144,6 @@ public class FirstFragment extends Fragment {
             binding.layoutBotPresence.setVisibility(View.VISIBLE);
             binding.tvLastBotMessage.setText(lastBotMsg);
             
-            // Zmieniamy na say_1/say_2 TYLKO jeśli to faktycznie nowa odpowiedź bota
             if (isNewBotMessage) {
                 if (useSay1) {
                     binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_say_1);
@@ -158,6 +156,8 @@ public class FirstFragment extends Fragment {
             binding.layoutBotPresence.setVisibility(View.GONE);
             binding.ivFixedBotAvatar.setImageResource(R.drawable.sebastian_wheit);
         }
+        
+        binding.scrollViewChat.post(() -> binding.scrollViewChat.fullScroll(View.FOCUS_DOWN));
     }
 
     private void processModelResponse(String rawText) {
@@ -201,19 +201,16 @@ public class FirstFragment extends Fragment {
         String type = taskJson.optString("type", "E");
         String extraInfo = taskJson.optString("extraInfo", "");
 
-        // Walidacja i formatowanie extraInfo dla specyficznych typów
         if ("R".equals(type)) {
-            // Dla Recurring extraInfo musi być liczbą dni
             if (extraInfo.isEmpty() || !extraInfo.matches("\\d+")) {
-                extraInfo = "7"; // Domyślnie tydzień
+                extraInfo = "7";
             }
         } else if ("L".equals(type)) {
-            // Dla Large extraInfo powinno być "current/total"
             if (!extraInfo.contains("/")) {
                 if (extraInfo.matches("\\d+")) {
                     extraInfo = "0/" + extraInfo;
                 } else {
-                    extraInfo = "0/3"; // Domyślnie 3 kroki
+                    extraInfo = "0/3";
                 }
             }
         }
@@ -312,9 +309,8 @@ public class FirstFragment extends Fragment {
     private void addMessage(ChatMessage message) {
         chatMessages.add(message);
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
-        binding.recyclerViewChat.scrollToPosition(chatMessages.size() - 1);
         saveChatHistory();
-        updateBotPresence(!message.isUser); // Zmień obrazek tylko jeśli to wiadomość bota
+        updateBotPresence(!message.isUser);
     }
 
     private void saveChatHistory() {

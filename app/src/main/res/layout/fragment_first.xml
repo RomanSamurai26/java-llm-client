@@ -4,81 +4,85 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="8dp"
     android:background="@color/app_bg"
     tools:context=".FirstFragment">
 
-    <!-- Historia czatu -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_view_chat"
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll_view_chat"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginBottom="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/layout_bot_presence"
+        android:fillViewport="true"
+        app:layout_constraintBottom_toTopOf="@+id/layout_input"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
 
-    <!-- Avatar Lokaja i dymek (Przycięty po bokach i powiększony) -->
-
-    <!-- Kontener na prompt i przycisk -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/layout_bot_presence"
-        android:layout_width="270dp"
-        android:layout_height="wrap_content"
-        android:minHeight="345dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/layout_input"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:visibility="visible">
-
-        <!-- Ostatnia wiadomość bota -->
-
-        <!-- Dzióbek dymka -->
-
-        <!-- Stały avatar Lokaja (centerCrop przycina boki obrazu) -->
-
-        <ImageView
-            android:id="@+id/iv_fixed_bot_avatar"
-            android:layout_width="230dp"
-            android:layout_height="400dp"
-            android:layout_marginBottom="-100dp"
-            android:contentDescription="Butler Avatar"
-            android:scaleType="centerCrop"
-            android:src="@drawable/sebastian_wheit"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
-
-        <View
-            android:id="@+id/view_bubble_arrow"
-            android:layout_width="61dp"
-            android:layout_height="45dp"
-            android:layout_marginStart="15dp"
-            android:layout_marginBottom="-10dp"
-            android:background="@drawable/bg_chat_bot"
-            android:rotation="-60"
-            app:layout_constraintBottom_toTopOf="@+id/iv_fixed_bot_avatar"
-            app:layout_constraintStart_toStartOf="parent" />
-
-        <TextView
-            android:id="@+id/tv_last_bot_message"
-            android:layout_width="252dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginBottom="2dp"
-            android:background="@drawable/bg_chat_bot"
-            android:maxWidth="280dp"
-            android:padding="12dp"
-            android:text="Ostatnia odpowiedź bota"
-            android:textColor="@color/chat_bot_text"
-            android:textSize="16sp"
-            android:lineSpacingExtra="2dp"
-            app:layout_constraintBottom_toTopOf="@+id/iv_fixed_bot_avatar"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
+            android:orientation="vertical"
+            android:padding="8dp">
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+            <!-- Historia czatu -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_view_chat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                tools:listitem="@layout/item_chat_bot" />
+
+            <!-- Kontener na prompt i przycisk (Sekcja asystenta) -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/layout_bot_presence"
+                android:layout_width="270dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:minHeight="345dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:id="@+id/iv_fixed_bot_avatar"
+                    android:layout_width="230dp"
+                    android:layout_height="400dp"
+                    android:layout_marginBottom="-100dp"
+                    android:contentDescription="Butler Avatar"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/sebastian_wheit"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
+
+                <View
+                    android:id="@+id/view_bubble_arrow"
+                    android:layout_width="61dp"
+                    android:layout_height="45dp"
+                    android:layout_marginStart="15dp"
+                    android:layout_marginBottom="-10dp"
+                    android:background="@drawable/bg_chat_bot"
+                    android:rotation="-60"
+                    app:layout_constraintBottom_toTopOf="@+id/iv_fixed_bot_avatar"
+                    app:layout_constraintStart_toStartOf="parent" />
+
+                <TextView
+                    android:id="@+id/tv_last_bot_message"
+                    android:layout_width="252dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginBottom="2dp"
+                    android:background="@drawable/bg_chat_bot"
+                    android:maxWidth="280dp"
+                    android:padding="12dp"
+                    android:text="Ostatnia odpowiedź bota"
+                    android:textColor="@color/chat_bot_text"
+                    android:textSize="16sp"
+                    android:lineSpacingExtra="2dp"
+                    app:layout_constraintBottom_toTopOf="@+id/iv_fixed_bot_avatar"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
     <LinearLayout
         android:id="@+id/layout_input"
@@ -89,6 +93,7 @@
         android:orientation="horizontal"
         android:background="@color/input_bg"
         android:elevation="4dp"
+        android:padding="4dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <EditText
